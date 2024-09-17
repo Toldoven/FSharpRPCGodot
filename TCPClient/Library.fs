@@ -19,8 +19,11 @@ type Client(client: TcpClient) =
     let mutable requestId = 0
     let requestDictionary = Dictionary<int, TaskCompletionSource<byte array>>()
     
-    member private this.makeRequestRoute<'req, 'res> (route: RequestRoute<'req, 'res>) = fun (request: 'req) -> async {
-        do! streamWriteLock.WaitAsync() |> Async.AwaitTask
+    
+    // Route path to event handler
+    let eventHandlerDictionary = Dictionary<String, byte array -> unit>()
+    
+    member private this.makeRequest<'req, 'res> (route: RequestRoute<'req, 'res>) = fun (request: 'req) -> async {
         
         // Similar to CompletableFuture in Java
         let taskCompletionSource = TaskCompletionSource<byte array>()
@@ -32,8 +35,10 @@ type Client(client: TcpClient) =
         
         let packetMeta = {
             packetType = ClientRequest requestId
-            route = route.Route
+            route = route.Path
         }
+        
+        do! streamWriteLock.WaitAsync() |> Async.AwaitTask
         
         try 
            do! sendPacket packetMeta request stream
@@ -46,28 +51,41 @@ type Client(client: TcpClient) =
         return MessagePackSerializer.Deserialize<'res>(result, options)
     }
     
-    member this.Echo = this.makeRequestRoute echoRequest
+    member private this.makeServerEvent<'e> (route: ServerEventRoute<'e>) =
+        let event = new Event<'e>()
+        
+        let handler = fun (body: byte array) ->
+            let message = MessagePackSerializer.Deserialize<'e>(body, options)
+            event.Trigger message
+        
+        eventHandlerDictionary.Add(route.Path, handler)
+        
+        event.Publish
+        
+        
+    member private this.makeClientEvent<'e> (route: ClientEventRoute<'e>) = fun (event: 'e) -> async {
+        
+        let packetMeta = {
+            packetType = ClientEvent
+            route = route.Path
+        }
+        
+        do! streamWriteLock.WaitAsync() |> Async.AwaitTask
+        
+        try 
+           do! sendPacket packetMeta event stream
+        finally
+            streamWriteLock.Release() |> ignore
+    }
     
-    //
-    //
-    // let eventReceived = new Event<ServerEvent>()
-    //
-    // let mutable requestQueue = Queue()
-    //
-    // [<CLIEvent>]
-    // member this.EventReceived = eventReceived.Publish
-    //
-    // member this.SendEvent(event: ClientEvent) = task {
-    //     printfn $"Sending event to the server: %A{event}"
-    //     do! streamSemaphore.WaitAsync() |> Async.AwaitTask
-    //     try
-    //         do! MessagePack.sendMessage(stream, ClientMessage.Event(event))
-    //     finally
-    //         streamSemaphore.Release() |> ignore
-    // }
-    //
+    member this.Echo = this.makeRequest echoRequest
+    
+    member this.Ping = this.makeClientEvent pingEvent
+    
+    [<CLIEvent>]
+    member this.Pong = this.makeServerEvent pongEvent
 
-    member this.ReadLoop = async {
+    member this.Handle = async {
         while client.Connected do
             let! meta, body = readPacket<ServerPacketType>(stream)
             match meta.packetType with
@@ -75,13 +93,11 @@ type Client(client: TcpClient) =
                 // Find a task by a requestId and complete it
                 let task = requestDictionary[requestId]
                 task.SetResult(body)
-            | ServerEvent -> failwith "todo"
+            | ServerEvent ->
+                // Get a handler for a route and pass a body into it. This will trigger the event
+                eventHandlerDictionary[meta.route] body
     }
    
-    
-    
-
-    
     
 module Pepega =
     let testClient () = async {
@@ -91,17 +107,20 @@ module Pepega =
         
         let client = Client(tcpClient)
         
-        client.ReadLoop |> Async.Start
+        client.Handle |> Async.Start
         
-        // client.EventReceived.Add(fun event ->
-        //     printfn $"Received an Event from the server: %A{event}"
-        // )
+        client.Pong.Add(fun _ ->
+            printfn $"Pong!"
+        )
         
         let testPing () = async {
             while true do
                 printfn "Sending request..."
                 let! response = client.Echo { message = "Hello world!" }
                 printfn $"Received response: {response}"
+                do! Async.Sleep(1000)
+                printfn "Ping..."
+                do! client.Ping(())
                 do! Async.Sleep(1000)
         }
         

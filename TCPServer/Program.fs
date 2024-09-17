@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open System.Net
 open System.Net.Sockets
+open System.Threading
 open MessagePack
 open Protocol
 open TCPClient
@@ -20,69 +21,93 @@ type Router<'state>() =
     
     member this.getRequestHandler (route: String) =
         requestRouteDictionary[route]
+        
+    member this.getEventHandler (route: String) =
+        eventRouteDictionary[route]
      
     member this.addRequestHandler (route: RequestRoute<'req, 'res>) (handler: 'state -> 'req -> Async<'res>) =
-        
-        printfn $"Adding route: {route.Route}"
-        
         let handler = fun (state: 'state) (body: byte array) -> async {
             let request = MessagePackSerializer.Deserialize(body, options)
             let! response = handler state request
             let result = MessagePackSerializer.Serialize<'res>(response, options)
             return result
         }
+        requestRouteDictionary.Add(route.Path, handler)
         
-        let result = requestRouteDictionary.TryAdd(route.Route, handler)
-        
-        if not result then raise (
-            InvalidOperationException("Tried to add a handler for the same route twice")
-        )
-        
-    member this.addEventHandler (route: EventRoute<'e>) (handler: 'state -> 'e -> Async<unit>) =
+    member this.addClientEventHandler (route: ClientEventRoute<'e>) (handler: 'state -> 'e -> Async<unit>) =
         let handler = fun (state: 'state) (body: byte array) -> async {
             let event = MessagePackSerializer.Deserialize(body, options)
             do! handler state event
         }
-        let result = eventRouteDictionary.TryAdd(route.Route, handler)
-        if not result then raise (
-            InvalidOperationException("Tried to add a handler for the same route twice")
-        )
- 
-let handleClient (client: TcpClient) (router: Router<unit>) = async {
+        eventRouteDictionary.Add(route.Path, handler)
+  
+  
+type ClientHandler (client: TcpClient, router: Router<ClientHandler>) =
     let stream = client.GetStream()
-    while true do
-        let! meta, body = readPacket<ClientPacketType>(stream)
-        match meta.packetType with
-        | ClientRequest requestId ->
-            // TODO: A new task should be started here. The whole server doesn't have multithreading now
-            let! response = router.getRequestHandler meta.route () body
-            let packetMeta = {
-                packetType = ServerResponse requestId
-                route = meta.route
-            }
-            // /|\ That's why it's also safe to write here without locking the stream
-            do! sendRawPacket packetMeta response stream
-        | ClientEvent -> failwith "todo"
-}
-
-
-let router = Router<unit>()
+    
+    // We need to make sure there is only one writer at the same time
+    // We never have more than one reader, so we don't need to lock when reading
+    let streamWriteLock = new SemaphoreSlim(1)
+    
+    member private this.makeServerEvent<'e> (route: ServerEventRoute<'e>) = fun (event: 'e) -> async {
+        
+        let packetMeta = {
+            packetType = ServerEvent
+            route = route.Path
+        }
+        
+        do! streamWriteLock.WaitAsync() |> Async.AwaitTask
+        
+        try 
+           do! sendPacket packetMeta event stream
+        finally
+            streamWriteLock.Release() |> ignore
+    }
+    
+    member this.Pong = this.makeServerEvent pongEvent
+        
+    member this.Handle = async {
+        while client.Connected do
+            let! meta, body = readPacket<ClientPacketType>(stream)
+            match meta.packetType with
+            | ClientRequest requestId ->
+                // TODO: A new task should be started here
+                let! response = router.getRequestHandler meta.route this body
+                let packetMeta = {
+                    packetType = ServerResponse requestId
+                    route = meta.route
+                }
+                do! streamWriteLock.WaitAsync() |> Async.AwaitTask
+                try 
+                    do! sendRawPacket packetMeta response stream
+                finally
+                    streamWriteLock.Release() |> ignore
+               
+            | ClientEvent ->
+                // TODO: A new task should be started here
+                do! router.getEventHandler meta.route this body
+    }
+   
+let router = Router<ClientHandler>()
 
 router.addRequestHandler echoRequest (fun _ request -> async {
     return request
 })
 
-let runServer (listener: TcpListener) = async {
-    while true do
-        let! client = listener.AcceptTcpClientAsync() |> Async.AwaitTask
-        printfn "Client connected"
-        Async.Start(handleClient client router)
-}
+router.addClientEventHandler pingEvent (fun state _ -> async {
+    do! state.Pong()
+})
 
 let tcpListener = TcpListener(IPAddress.Any, 8080)
 printfn "Server started on port 8080"
 tcpListener.Start()
 
-Async.Start(runServer tcpListener)
+async {
+    while true do
+        let! client = tcpListener.AcceptTcpClientAsync() |> Async.AwaitTask
+        printfn "Client connected"
+        let clientHandler = ClientHandler(client, router)
+        Async.Start(clientHandler.Handle)
+} |> Async.Start
 
 Async.RunSynchronously(Pepega.testClient())

@@ -18,30 +18,16 @@ let options = MessagePackSerializerOptions.Standard.WithResolver(resolver)
 
 // Route
     
-type RequestRoute<'req, 'res>(route: String) =  
-    member val Route = route
+type RequestRoute<'req, 'res>(path: String) =  
+    member val Path = path
     
-[<MessagePackObject>]
-type Echo = {
-    [<Key(0)>]
-    message: string
-}
-
-let echoRequest = RequestRoute<Echo, Echo>("echo")
-
+type ServerEventRoute<'e>(path: String) =   
+    member val Path = path
     
-// type EventRoute<'e>(route: String) =   
-//     member val Route = route
+type ClientEventRoute<'e>(path: String) =   
+    member val Path = path
     
-
-// type Ping() = class end
-//
-// type Pong() = class end    
-//
-// let pingEvent = EventRoute<Ping>("ping")
-//
-// let pongEvent = EventRoute<Ping>("ping")
-
+// Packet
 
 [<MessagePackObject>]
 type ClientPacketType =
@@ -96,3 +82,15 @@ let readPacket<'a> (stream: NetworkStream) = async {
      let! body = stream.AsyncRead(bodyLength)
      return (meta, body)
 }
+
+[<MessagePackObject>]
+type Echo = {
+    [<Key(0)>]
+    message: string
+}
+
+let echoRequest = RequestRoute<Echo, Echo>("echo")
+
+let pingEvent = ClientEventRoute<unit>("ping")
+
+let pongEvent = ServerEventRoute<unit>("pong")
