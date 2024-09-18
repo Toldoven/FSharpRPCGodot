@@ -18,14 +18,19 @@ let options = MessagePackSerializerOptions.Standard.WithResolver(resolver)
 
 // Route
     
-type RequestRoute<'req, 'res>(path: String) =  
-    member val Path = path
+type RequestRoute<'req, 'res> = { Path: String }
+
+let requestRoute<'req, 'res> path : RequestRoute<'req, 'res> = { Path = path }
     
-type ServerEventRoute<'e>(path: String) =   
-    member val Path = path
     
-type ClientEventRoute<'e>(path: String) =   
-    member val Path = path
+type ServerEventRoute<'e> = { Path: String }
+
+let serverEventRoute<'e> path : ServerEventRoute<'e> = { Path = path }
+   
+   
+type ClientEventRoute<'e> = { Path: String }
+
+let clientEventRoute<'e> path : ClientEventRoute<'e> = { Path = path }
     
 // Packet
 
@@ -46,30 +51,28 @@ type PacketMeta<'T> = {
     [<Key(1)>]
     route: String
 }
-    
-let private sendWithLengthRaw (data: byte array) (stream: NetworkStream) = async {
-     let dataLengthBuffer = BitConverter.GetBytes(data.Length)
-     do! stream.AsyncWrite(dataLengthBuffer)
-     do! stream.AsyncWrite(data)
-}
-   
-let private sendWithLength (data: 'a) (stream: NetworkStream) = async {
-     let messageBuffer = MessagePackSerializer.Serialize<'a>(data, options)
-     do! sendWithLengthRaw messageBuffer stream
-}
 
+let private serializeWithLengthRaw (data: byte array) = 
+    let dataLengthBuffer = BitConverter.GetBytes(data.Length)
+    Array.concat [dataLengthBuffer; data]
+
+let private serializeWithLength (data: 'a) = 
+    let messageBuffer = MessagePackSerializer.Serialize<'a>(data, options)
+    serializeWithLengthRaw messageBuffer
 
 // Send packet and serialize body
-let sendPacket (packetMeta: PacketMeta<'a>) (body: 'b) (stream: NetworkStream) = async {
-    do! sendWithLength packetMeta stream
-    do! sendWithLength body stream
-}
+let serializePacket (packetMeta: PacketMeta<'a>) (body: 'b) = 
+    let packetMetaBytes = serializeWithLength packetMeta
+    let bodyBytes = serializeWithLength body
+    Array.concat [packetMetaBytes; bodyBytes]
 
 // Send packet with body that is already serialized
-let sendRawPacket (packetMeta: PacketMeta<'a>) (body: byte array) (stream: NetworkStream) = async {
-    do! sendWithLength packetMeta stream
-    do! sendWithLengthRaw body stream
-}
+let serializePacketRaw (packetMeta: PacketMeta<'a>) (body: byte array) = 
+    let packetMetaBytes = serializeWithLength packetMeta
+    let bodyBytes = serializeWithLengthRaw body
+    Array.concat [packetMetaBytes; bodyBytes]
+
+
 
 // Read packet from stream
 let readPacket<'a> (stream: NetworkStream) = async {
@@ -89,8 +92,20 @@ type Echo = {
     message: string
 }
 
-let echoRequest = RequestRoute<Echo, Echo>("echo")
+let echoRequest = requestRoute<Echo, Echo> "echo"
 
-let pingEvent = ClientEventRoute<unit>("ping")
+let pingEvent = clientEventRoute<unit> "ping"
 
-let pongEvent = ServerEventRoute<unit>("pong")
+let pongEvent = serverEventRoute<unit> "pong"
+
+
+
+let writerAgent (client: TcpClient) = new MailboxProcessor<byte array>(fun inbox ->
+    let stream = client.GetStream()
+    let rec loop () = async {
+        let! packet = inbox.Receive()
+        do! stream.AsyncWrite(packet)
+        return! loop()
+    }
+    loop()
+)

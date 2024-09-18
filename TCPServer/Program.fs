@@ -9,10 +9,6 @@ open MessagePack
 open Protocol
 open TCPClient
 
-type RequestHandler<'state> = 'state -> byte array -> Async<byte array>
-
-type EventHandler<'state> = 'state -> byte array -> Async<unit>
-
 
 type Router<'state>() =
     let requestRouteDictionary = Dictionary<String, 'state -> byte array -> Async<byte array>>()
@@ -44,49 +40,46 @@ type Router<'state>() =
   
 type ClientHandler (client: TcpClient, router: Router<ClientHandler>) =
     let stream = client.GetStream()
+   
+    let writerAgent = writerAgent client
     
-    // We need to make sure there is only one writer at the same time
-    // We never have more than one reader, so we don't need to lock when reading
-    let streamWriteLock = new SemaphoreSlim(1)
+    member private this.handlePacket (meta: PacketMeta<ClientPacketType>, body: byte array) = async {
+        match meta.packetType with
+        | ClientRequest requestId ->
+            let! response = router.getRequestHandler meta.route this body
+            let packetMeta = {
+                packetType = ServerResponse requestId
+                route = meta.route
+            }
+            writerAgent.Post(
+                serializePacketRaw packetMeta response
+            )
+        | ClientEvent ->
+            do! router.getEventHandler meta.route this body
+    }
     
-    member private this.makeServerEvent<'e> (route: ServerEventRoute<'e>) = fun (event: 'e) -> async {
         
+    member private this.makeServerEvent (route: ServerEventRoute<'e>) = fun (event: 'e) ->
         let packetMeta = {
             packetType = ServerEvent
             route = route.Path
         }
-        
-        do! streamWriteLock.WaitAsync() |> Async.AwaitTask
-        
-        try 
-           do! sendPacket packetMeta event stream
-        finally
-            streamWriteLock.Release() |> ignore
-    }
+        writerAgent.Post(
+            serializePacket packetMeta event
+        )
     
     member this.Pong = this.makeServerEvent pongEvent
         
-    member this.Handle = async {
-        while client.Connected do
-            let! meta, body = readPacket<ClientPacketType>(stream)
-            match meta.packetType with
-            | ClientRequest requestId ->
-                // TODO: A new task should be started here
-                let! response = router.getRequestHandler meta.route this body
-                let packetMeta = {
-                    packetType = ServerResponse requestId
-                    route = meta.route
-                }
-                do! streamWriteLock.WaitAsync() |> Async.AwaitTask
-                try 
-                    do! sendRawPacket packetMeta response stream
-                finally
-                    streamWriteLock.Release() |> ignore
-               
-            | ClientEvent ->
-                // TODO: A new task should be started here
-                do! router.getEventHandler meta.route this body
+    member this.Handle() = async {
+        let! packet = readPacket<ClientPacketType>(stream)
+        this.handlePacket packet |> Async.Start
+        if client.Connected then return! this.Handle()
     }
+    
+    member this.Start() =
+        writerAgent.Start()
+        this.Handle() |> Async.Start
+
    
 let router = Router<ClientHandler>()
 
@@ -95,19 +88,21 @@ router.addRequestHandler echoRequest (fun _ request -> async {
 })
 
 router.addClientEventHandler pingEvent (fun state _ -> async {
-    do! state.Pong()
+    state.Pong()
 })
 
 let tcpListener = TcpListener(IPAddress.Any, 8080)
 printfn "Server started on port 8080"
 tcpListener.Start()
 
-async {
-    while true do
-        let! client = tcpListener.AcceptTcpClientAsync() |> Async.AwaitTask
-        printfn "Client connected"
-        let clientHandler = ClientHandler(client, router)
-        Async.Start(clientHandler.Handle)
-} |> Async.Start
+let rec acceptClientLoop () = async {
+    let! client = tcpListener.AcceptTcpClientAsync() |> Async.AwaitTask
+    printfn "Client connected"
+    let clientHandler = ClientHandler(client, router)
+    clientHandler.Start()
+    return! acceptClientLoop()
+}
+
+acceptClientLoop() |> Async.Start
 
 Async.RunSynchronously(Pepega.testClient())

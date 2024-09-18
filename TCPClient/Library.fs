@@ -1,9 +1,9 @@
 ﻿namespace TCPClient
 
 open System
+open System.Collections.Concurrent
 open System.Collections.Generic
 open System.Net.Sockets
-open System.Threading
 open System.Threading.Tasks
 open MessagePack
 open Protocol
@@ -11,39 +11,51 @@ open Protocol
 type Client(client: TcpClient) =
     let stream = client.GetStream()
     
-    // We need to make sure there is only one writer at the same time
-    // We never have more than one reader, so we don't need to lock when reading
-    let streamWriteLock = new SemaphoreSlim(1)
-    
     // TODO: Replace with SlotMap
-    let mutable requestId = 0
-    let requestDictionary = Dictionary<int, TaskCompletionSource<byte array>>()
-    
+    let requestDictionary = ConcurrentDictionary<int, TaskCompletionSource<byte array>>()
     
     // Route path to event handler
     let eventHandlerDictionary = Dictionary<String, byte array -> unit>()
     
+    let writerAgent = writerAgent client
+    
+    let requestGeneratorAgent = new MailboxProcessor<AsyncReplyChannel<int * TaskCompletionSource<byte array>>>(fun inbox ->
+        let rec loop requestId = async {
+            let! replyChannel = inbox.Receive()
+            let requestId, task = requestId, TaskCompletionSource<byte array>()
+            assert requestDictionary.TryAdd(requestId, task)
+            replyChannel.Reply(requestId, task)
+            return! loop (requestId + 1)
+        }
+        loop 0
+    )
+    
+    let generateNewRequest () = requestGeneratorAgent.PostAndAsyncReply id
+    
+    
+    let handlePacket (meta: PacketMeta<ServerPacketType>, body: byte array) =
+       match meta.packetType with
+        | ServerResponse requestId ->
+            // Find a task by a requestId and complete it
+            requestDictionary[requestId].SetResult body
+            requestDictionary.Remove(requestId) |> ignore
+        | ServerEvent ->
+            // Get a handler for a route and pass a body into it. This will trigger the event
+            eventHandlerDictionary[meta.route] body
+    
+    
     member private this.makeRequest<'req, 'res> (route: RequestRoute<'req, 'res>) = fun (request: 'req) -> async {
-        
-        // Similar to CompletableFuture in Java
-        let taskCompletionSource = TaskCompletionSource<byte array>()
-        
-        // Atomic increment
-        let requestId = Interlocked.Increment(&requestId)
-        
-        assert requestDictionary.TryAdd(requestId, taskCompletionSource)
+    
+        let! requestId, taskCompletionSource = generateNewRequest()
         
         let packetMeta = {
             packetType = ClientRequest requestId
             route = route.Path
         }
         
-        do! streamWriteLock.WaitAsync() |> Async.AwaitTask
-        
-        try 
-           do! sendPacket packetMeta request stream
-        finally
-            streamWriteLock.Release() |> ignore
+        writerAgent.Post(
+            serializePacket packetMeta request
+        )
             
         // Wait until the Task is completed
         let! result = taskCompletionSource.Task |> Async.AwaitTask
@@ -64,18 +76,13 @@ type Client(client: TcpClient) =
         
         
     member private this.makeClientEvent<'e> (route: ClientEventRoute<'e>) = fun (event: 'e) -> async {
-        
         let packetMeta = {
             packetType = ClientEvent
             route = route.Path
         }
-        
-        do! streamWriteLock.WaitAsync() |> Async.AwaitTask
-        
-        try 
-           do! sendPacket packetMeta event stream
-        finally
-            streamWriteLock.Release() |> ignore
+        writerAgent.Post(
+            serializePacket packetMeta event
+        )
     }
     
     member this.Echo = this.makeRequest echoRequest
@@ -84,19 +91,18 @@ type Client(client: TcpClient) =
     
     [<CLIEvent>]
     member this.Pong = this.makeServerEvent pongEvent
+    
 
-    member this.Handle = async {
-        while client.Connected do
-            let! meta, body = readPacket<ServerPacketType>(stream)
-            match meta.packetType with
-            | ServerResponse requestId ->
-                // Find a task by a requestId and complete it
-                let task = requestDictionary[requestId]
-                task.SetResult(body)
-            | ServerEvent ->
-                // Get a handler for a route and pass a body into it. This will trigger the event
-                eventHandlerDictionary[meta.route] body
+    member this.Handle () = async {
+        let! packet = readPacket<ServerPacketType>(stream)
+        handlePacket packet
+        if client.Connected then return! this.Handle()
     }
+    
+    member this.Start() =
+        writerAgent.Start()
+        requestGeneratorAgent.Start()
+        this.Handle() |> Async.Start
    
     
 module Pepega =
@@ -107,23 +113,29 @@ module Pepega =
         
         let client = Client(tcpClient)
         
-        client.Handle |> Async.Start
+        client.Start()
         
-        client.Pong.Add(fun _ ->
+        use _ = client.Pong |> Observable.subscribe (fun _ ->
             printfn $"Pong!"
         )
         
-        let testPing () = async {
+        let random = Random()
+        
+        let testTask (thread: int) = async {
             while true do
-                printfn "Sending request..."
+                printfn $"Thread: {thread}. Sending request..."
                 let! response = client.Echo { message = "Hello world!" }
-                printfn $"Received response: {response}"
-                do! Async.Sleep(1000)
-                printfn "Ping..."
+                printfn $"Thread: {thread}. Received response: {response}"
+                do! Async.Sleep(random.Next(100, 500))
+                printfn $"Thread: {thread}. Ping..."
                 do! client.Ping(())
-                do! Async.Sleep(1000)
+                do! Async.Sleep(random.Next(100, 500))
         }
         
-        do! testPing()
+        do! [1..100]
+            |> List.map testTask
+            |> Async.Parallel
+            |> Async.Ignore
+        
     }
         
