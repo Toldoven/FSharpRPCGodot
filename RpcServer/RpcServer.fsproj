@@ -7,9 +7,7 @@
 
     <ItemGroup>
         <Compile Include="Server.fs" />
-        <Compile Include="ServiceClient\TestService.fs" />
-        <Compile Include="State.fs" />
-        <Compile Include="ServiceRouter\TestService.fs" />
+        <Compile Include="Service\TestService.fs" />
         <Compile Include="Program.fs" />
     </ItemGroup>
 

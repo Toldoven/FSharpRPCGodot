@@ -8,5 +8,8 @@
         <EnableDynamicLoading>true</EnableDynamicLoading>
         <RootNamespace>Client</RootNamespace>
     </PropertyGroup>
+    <ItemGroup>
+      <ProjectReference Include="..\RpcClient\RpcClient.fsproj" />
+    </ItemGroup>
 </Project>
 

@@ -25,15 +25,15 @@ let testClient () = async {
     let testTask (thread: int) = async {
         while true do
             printfn $"Thread: {thread}. Sending request..."
-            let! response = testService.Echo { message = "Hello world!" }
+            let! response = testService.Echo { message = "Hello world!" } |> Async.AwaitTask
             printfn $"Thread: {thread}. Received response: {response}"
             do! Async.Sleep(random.Next(100, 500))
             printfn $"Thread: {thread}. Ping..."
-            do! testService.Ping(())
+            testService.Ping(())
             do! Async.Sleep(random.Next(100, 500))
     }
     
-    do! [1..100]
+    do! [1..2]
         |> List.map testTask
         |> Async.Parallel
         |> Async.Ignore
