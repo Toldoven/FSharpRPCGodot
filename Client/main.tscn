@@ -1,31 +1,74 @@
-[gd_scene load_steps=2 format=3 uid="uid://c5m01vu08b6xk"]
+[gd_scene load_steps=4 format=3 uid="uid://c5m01vu08b6xk"]
 
-[ext_resource type="Script" path="res://Main.cs" id="1_pke4o"]
+[ext_resource type="Script" path="res://Rpc.cs" id="1_5516p"]
+[ext_resource type="Script" path="res://RpcTestPanel.cs" id="1_icr6n"]
+[ext_resource type="Script" path="res://RpcLabel.cs" id="3_r8j3w"]
 
 [node name="Main" type="Node"]
-script = ExtResource("1_pke4o")
+
+[node name="Rpc" type="Node" parent="."]
+script = ExtResource("1_5516p")
 
 [node name="CanvasLayer" type="CanvasLayer" parent="."]
 
-[node name="HBoxContainer" type="VBoxContainer" parent="CanvasLayer"]
-offset_right = 59.0
-offset_bottom = 43.0
+[node name="RpcTestPanel" type="Control" parent="CanvasLayer" node_paths=PackedStringArray("_rpc")]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_icr6n")
+_rpc = NodePath("../../Rpc")
 
-[node name="EchoText" type="TextEdit" parent="CanvasLayer/HBoxContainer"]
+[node name="HBoxContainer" type="VBoxContainer" parent="CanvasLayer/RpcTestPanel"]
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -180.0
+offset_top = -91.0
+offset_right = 180.0
+offset_bottom = 91.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="RpcLabel" type="Label" parent="CanvasLayer/RpcTestPanel/HBoxContainer" node_paths=PackedStringArray("_rpc")]
+layout_mode = 2
+script = ExtResource("3_r8j3w")
+_rpc = NodePath("../../../../Rpc")
+
+[node name="VBoxContainer" type="HBoxContainer" parent="CanvasLayer/RpcTestPanel/HBoxContainer"]
+layout_mode = 2
+
+[node name="ConnectButton" type="Button" parent="CanvasLayer/RpcTestPanel/HBoxContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Connect"
+
+[node name="DisconnectButton" type="Button" parent="CanvasLayer/RpcTestPanel/HBoxContainer/VBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Disconnect"
+
+[node name="EchoText" type="TextEdit" parent="CanvasLayer/RpcTestPanel/HBoxContainer"]
 unique_name_in_owner = true
 custom_minimum_size = Vector2(360, 50)
 layout_mode = 2
 
-[node name="EchoButton" type="Button" parent="CanvasLayer/HBoxContainer"]
+[node name="EchoButton" type="Button" parent="CanvasLayer/RpcTestPanel/HBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Send"
 
-[node name="PingButton" type="Button" parent="CanvasLayer/HBoxContainer"]
+[node name="PingButton" type="Button" parent="CanvasLayer/RpcTestPanel/HBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
 text = "Ping"
 
-[node name="ResultLabel" type="Label" parent="CanvasLayer/HBoxContainer"]
+[node name="ResultLabel" type="Label" parent="CanvasLayer/RpcTestPanel/HBoxContainer"]
 unique_name_in_owner = true
 layout_mode = 2
+text = "Result: None"

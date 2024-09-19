@@ -20,9 +20,8 @@ Log.Logger <- LoggerConfiguration()
 let port = 8080
 
 let tcpListener = TcpListener(IPAddress.Any, port)
-Log.Information $"Server started on port {port}"
+Log.Information $"Listener started on port {port}"
 tcpListener.Start()
-
 
 let rec acceptClientLoop () = async {
     let! client = tcpListener.AcceptTcpClientAsync() |> Async.AwaitTask
@@ -36,5 +35,3 @@ let rec acceptClientLoop () = async {
 }
 
 acceptClientLoop() |> Async.RunSynchronously
-
-// Async.RunSynchronously(testClient())

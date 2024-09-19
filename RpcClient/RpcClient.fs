@@ -6,9 +6,7 @@ open System.Net.Sockets
 open System.Threading
 open System.Threading.Tasks
 open Microsoft.FSharp.Core
-open RpcProtocol
 open RpcProtocol.Library
-
 
 type private RequestAgentMessage =
     | Register of replyChannel: AsyncReplyChannel<int * TaskCompletionSource<byte array>>
@@ -41,7 +39,6 @@ type RpcClient() =
     // This agent is used so that you can only access `requestDictionary` once at the same time
     // Don't access `requestDictionary` directly
     let requestAgent = new MailboxProcessor<RequestAgentMessage>(fun inbox ->
-       
         let rec loop currentRequestId = async {
             let! message = inbox.Receive()
             match message with
@@ -81,6 +78,7 @@ type RpcClient() =
             
     interface IDisposable with
         member this.Dispose() =
+            disconnectedEvent.Trigger(this, ())
             cancellationToken.Cancel()
             cancellationToken.Dispose()
             tcpClient.Dispose()
@@ -145,7 +143,6 @@ type RpcClient() =
             return! this.handle ()
         with
         | _ ->
-            disconnectedEvent.Trigger(this, ())
             (this :> IDisposable).Dispose()
     }
 
