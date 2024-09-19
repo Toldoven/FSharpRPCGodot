@@ -1,0 +1,25 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <OutputType>Exe</OutputType>
+        <TargetFramework>net6.0</TargetFramework>
+    </PropertyGroup>
+
+    <ItemGroup>
+        <Compile Include="Server.fs" />
+        <Compile Include="ServiceClient\TestService.fs" />
+        <Compile Include="State.fs" />
+        <Compile Include="ServiceRouter\TestService.fs" />
+        <Compile Include="Program.fs" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\RpcProtocol\RpcProtocol.fsproj" />
+      <ProjectReference Include="..\RpcClient\RpcClient.fsproj" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Update="FSharp.Core" Version="7.0.0" />
+    </ItemGroup>
+
+</Project>

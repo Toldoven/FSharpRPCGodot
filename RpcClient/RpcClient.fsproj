@@ -7,10 +7,12 @@
 
     <ItemGroup>
         <Compile Include="Library.fs"/>
+        <Compile Include="Service\TestService.fs" />
+        <Compile Include="Test.fs" />
     </ItemGroup>
 
     <ItemGroup>
-      <ProjectReference Include="..\Protocol\Protocol.fsproj" />
+      <ProjectReference Include="..\RpcProtocol\RpcProtocol.fsproj" />
     </ItemGroup>
 
     <ItemGroup>
