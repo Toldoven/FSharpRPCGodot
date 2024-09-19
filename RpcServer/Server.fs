@@ -5,6 +5,7 @@ open System.Collections.Generic
 open System.Net.Sockets
 open System.Threading
 open RpcProtocol.Library
+open Serilog
 
 
 exception UnknownRoute of route: string
@@ -43,6 +44,7 @@ type Router () =
 
 
 and RpcServer (tcpClient: TcpClient, router: Router) =
+    let clientAddress = tcpClient.Client.RemoteEndPoint.ToString()
     
     let writerAgent = writerAgent tcpClient
     
@@ -58,7 +60,6 @@ and RpcServer (tcpClient: TcpClient, router: Router) =
         )
     
     member private this.handlePacket (meta: PacketMeta<ClientPacketType>, body: byte array) = async {
-        
         match meta.packetType with
         | ClientRequest requestId ->
             try
@@ -72,7 +73,7 @@ and RpcServer (tcpClient: TcpClient, router: Router) =
                 )
             with
             | e ->
-                printfn $"Error when processing request at `{meta.route}`: {e}"
+                Log.Warning(e, $"Error when processing request {meta.route} from {clientAddress}")
                 let packetMeta = {
                     packetType = ServerResponse (requestId, false)
                     route = meta.route
@@ -86,7 +87,7 @@ and RpcServer (tcpClient: TcpClient, router: Router) =
                 do! router.GetEventHandler meta.route this body
             with
             | e ->
-                printfn $"Error when processing event at `{meta.route}`: {e}"
+                Log.Warning(e, $"Error when processing event {meta.route} from {clientAddress}")
     }
     
     interface IDisposable with
@@ -104,10 +105,11 @@ and RpcServer (tcpClient: TcpClient, router: Router) =
             return! this.handle ()
         with
         | _ ->
-            printfn "Client disconnected"
+            Log.Information $"Client disconnected {clientAddress}"
             (this :> IDisposable).Dispose()     
     }
     
     member this.Start() =
+        Log.Information $"Client connected {clientAddress}"
         writerAgent.Start()
         this.handle () |> Async.Start
