@@ -1,5 +1,6 @@
 module RpcClient.Service.TestService
 
+open RpcClient
 open RpcClient.Library
 open RpcProtocol.Service.TestService
 

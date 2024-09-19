@@ -27,6 +27,6 @@ let rec acceptClientLoop () = async {
     return! acceptClientLoop()
 }
 
-acceptClientLoop() |> Async.Start
+acceptClientLoop() |> Async.RunSynchronously
 
-Async.RunSynchronously(testClient())
+// Async.RunSynchronously(testClient())

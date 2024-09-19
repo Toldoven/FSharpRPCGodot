@@ -13,6 +13,9 @@ type private RequestAgentMessage =
 
 type RpcClient(tcpClient: TcpClient) =
     
+    do
+        printfn "AAAAAAAAAAAAAAAA"
+    
     // TODO: Replace with SlotMap
     let requestDictionary = Dictionary<int, TaskCompletionSource<byte array>>()
     
@@ -48,6 +51,7 @@ type RpcClient(tcpClient: TcpClient) =
     )
     
     let handlePacket (meta: PacketMeta<ServerPacketType>, body: byte array) =
+       printfn $"{meta}"
        match meta.packetType with
         | ServerResponse requestId ->
             // When we receive a response to a request 
@@ -87,11 +91,11 @@ type RpcClient(tcpClient: TcpClient) =
     // Assign it to a variable and annotate with [<CLIEvent>]
     // Then you can add listeners to this event
     member this.MakeServerEvent<'e> (route: ServerEventRoute<'e>) =
-        let event = new Event<'e>()
+        let event = new Event<EventHandler<'e>, 'e>()
         
         let handler = fun (body: byte array) ->
             let message = deserialize body
-            event.Trigger message
+            event.Trigger(this, message)
         
         eventHandlerDictionary.Add(route.Path, handler)
         

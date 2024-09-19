@@ -4,8 +4,3 @@
 
 [node name="Test" type="Node"]
 script = ExtResource("1_la6xe")
-
-[node name="Lable" type="Label" parent="."]
-offset_right = 40.0
-offset_bottom = 23.0
-text = "dsgsdgsdgdsgdgdgdsg"

@@ -11,5 +11,8 @@
     <ItemGroup>
       <ProjectReference Include="..\RpcClient\RpcClient.fsproj" />
     </ItemGroup>
+    <ItemGroup>
+      <PackageReference Include="Firebelley.GodotUtilities" Version="5.0.0" />
+    </ItemGroup>
 </Project>
 

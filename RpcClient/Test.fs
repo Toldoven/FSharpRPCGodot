@@ -2,6 +2,7 @@ module RpcClient.Test
 
 open System
 open System.Net.Sockets
+open RpcClient
 open RpcClient.Library
 open RpcClient.Service.TestService
 

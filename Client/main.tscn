@@ -4,3 +4,28 @@
 
 [node name="Main" type="Node"]
 script = ExtResource("1_pke4o")
+
+[node name="CanvasLayer" type="CanvasLayer" parent="."]
+
+[node name="HBoxContainer" type="VBoxContainer" parent="CanvasLayer"]
+offset_right = 59.0
+offset_bottom = 43.0
+
+[node name="EchoText" type="TextEdit" parent="CanvasLayer/HBoxContainer"]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(360, 50)
+layout_mode = 2
+
+[node name="EchoButton" type="Button" parent="CanvasLayer/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Send"
+
+[node name="PingButton" type="Button" parent="CanvasLayer/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Ping"
+
+[node name="ResultLabel" type="Label" parent="CanvasLayer/HBoxContainer"]
+unique_name_in_owner = true
+layout_mode = 2
