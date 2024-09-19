@@ -3,7 +3,7 @@ module RpcClient.Test
 open System
 open System.Net.Sockets
 open RpcClient
-open RpcClient.Library
+open RpcClient
 open RpcClient.Service.TestService
 
 let testClient () = async {
@@ -30,7 +30,7 @@ let testClient () = async {
             printfn $"Thread: {thread}. Received response: {response}"
             do! Async.Sleep(random.Next(100, 500))
             printfn $"Thread: {thread}. Ping..."
-            testService.Ping(())
+            testService.Ping()
             do! Async.Sleep(random.Next(100, 500))
     }
     

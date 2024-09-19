@@ -1,4 +1,4 @@
-module RpcProtocol.Service.TestService
+namespace RpcProtocol.Service.TestService
 
 open RpcProtocol.Library
 open MessagePack
@@ -9,8 +9,10 @@ type Echo = {
     message: string
 }
 
-let echoRequestRoute = requestRoute<Echo, Echo> "test:echo"
+module Route =
+    
+    let echoRequestRoute = requestRoute<Echo, Echo> "test:echo"
 
-let pingEventRoute = clientEventRoute<unit> "test:ping"
+    let pingEventRoute = clientEventRoute<unit> "test:ping"
 
-let pongEventRoute = serverEventRoute<unit> "test:pong"
+    let pongEventRoute = serverEventRoute<unit> "test:pong"

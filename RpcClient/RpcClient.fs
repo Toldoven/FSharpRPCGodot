@@ -1,4 +1,4 @@
-﻿module RpcClient.Library
+﻿namespace RpcClient
 
 open System
 open System.Collections.Generic
@@ -7,14 +7,11 @@ open System.Threading.Tasks
 open RpcProtocol
 open RpcProtocol.Library
 
-type private RequestAgentMessage =
+type RequestAgentMessage =
     | Register of replyChannel: AsyncReplyChannel<int * TaskCompletionSource<byte array>>
     | Complete of completedRequestId: int * responseBody: byte array
 
 type RpcClient(tcpClient: TcpClient) =
-    
-    do
-        printfn "AAAAAAAAAAAAAAAA"
     
     // TODO: Replace with SlotMap
     let requestDictionary = Dictionary<int, TaskCompletionSource<byte array>>()
@@ -61,7 +58,7 @@ type RpcClient(tcpClient: TcpClient) =
             body |> eventHandlerDictionary[meta.route]
     
     // Create a new request method for a given route. Returns a function that makes a request when called
-    member this.MakeRequest<'req, 'res> (route: RequestRoute<'req, 'res>) = fun (request: 'req) -> task {
+    member this.MakeRequest<'req, 'res> (route: RequestRoute<'req, 'res>) (request: 'req) = task {
     
         // Register a request. Generate a new requestId that is associated with a TaskCompletionSource
         let! requestId, taskCompletionSource = requestAgent.PostAndAsyncReply Register
@@ -101,7 +98,7 @@ type RpcClient(tcpClient: TcpClient) =
         
         event.Publish   
         
-    member this.MakeClientEvent<'e> (route: ClientEventRoute<'e>) = fun (event: 'e) ->
+    member this.MakeClientEvent<'e> (route: ClientEventRoute<'e>) (event: 'e) =
         let packetMeta = {
             packetType = ClientEvent
             route = route.Path

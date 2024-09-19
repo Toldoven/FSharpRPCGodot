@@ -1,14 +1,13 @@
-module RpcClient.Service.TestService
+namespace RpcClient.Service.TestService
 
 open RpcClient
-open RpcClient.Library
 open RpcProtocol.Service.TestService
 
 type TestServiceClient(client: RpcClient) =
     
-    member this.Echo = client.MakeRequest echoRequestRoute
+    member this.Echo echo = client.MakeRequest Route.echoRequestRoute echo
     
-    member this.Ping = client.MakeClientEvent pingEventRoute
+    member this.Ping () = client.MakeClientEvent Route.pingEventRoute ()
     
     [<CLIEvent>]
-    member this.Pong = client.MakeServerEvent pongEventRoute
+    member this.Pong = client.MakeServerEvent Route.pongEventRoute

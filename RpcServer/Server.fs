@@ -64,9 +64,12 @@ and RpcServer (tcpClient: TcpClient, router: Router) =
     }
         
     member this.Handle (stream: NetworkStream) = async {
-        let! packet = readPacket<ClientPacketType>(stream)
-        this.handlePacket packet |> Async.Start
-        if tcpClient.Connected then return! this.Handle stream
+        try
+            let! packet = readPacket<ClientPacketType>(stream)
+            this.handlePacket packet |> Async.Start
+            if tcpClient.Connected then return! this.Handle stream
+        with
+        | _ -> printfn "Client disconnected"
     }
     
     member this.Start() =
