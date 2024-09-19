@@ -2,6 +2,7 @@
 
 open System
 open System.Net.Sockets
+open System.Threading
 open MessagePack
 open MessagePack.FSharp
 open MessagePack.Resolvers
@@ -50,8 +51,16 @@ type ClientPacketType =
 [<MessagePackObject>]
 // Server to Client
 type ServerPacketType =
-    | ServerResponse of requestId: int
+    | ServerResponse of requestId: int * success: Boolean
     | ServerEvent
+    
+    
+[<MessagePackObject>]
+type ResponseFailure = {
+    [<Key(0)>]
+    message: String
+}
+    
     
 [<MessagePackObject>]
 // Metadata attached to every packet
@@ -68,7 +77,7 @@ let inline private getSerializedLength (data: byte array) = BitConverter.GetByte
 
 // Serialize length of data as raw bytes and the data itself with message pack
 let inline private serializeWithLength (data: 'a) = 
-    let messageBuffer = serialize<'a>(data)
+    let messageBuffer = serialize<'a> data
     getSerializedLength messageBuffer, messageBuffer
 
 // Send packet and serialize body
@@ -83,15 +92,25 @@ let serializePacketRaw (packetMeta: PacketMeta<'a>) (bodyBytes: byte array) =
     let bodyLength = getSerializedLength bodyBytes
     Array.concat [metaLength; metaBytes; bodyLength; bodyBytes]
 
+
+//
+let inline private asyncRead (stream: NetworkStream) (token: CancellationToken) (length: int) = async {
+    let buffer = Array.zeroCreate length
+    do! stream.ReadAsync(buffer, 0, length, token) |> Async.AwaitTask |> Async.Ignore
+    return buffer
+}
+    
+
 // Read packet from stream
-let readPacket<'a> (stream: NetworkStream) = async {
-     let! metaLengthBuffer = stream.AsyncRead(4)
+let readPacket<'a> (stream: NetworkStream) (token: CancellationToken) = async {
+     let asyncRead = asyncRead stream token
+     let! metaLengthBuffer = asyncRead 4
      let metaLength = BitConverter.ToInt32(metaLengthBuffer)
-     let! metaBuffer = stream.AsyncRead(metaLength)
-     let meta = MessagePackSerializer.Deserialize<PacketMeta<'a>>(metaBuffer, options)
-     let! bodyLengthBuffer = stream.AsyncRead(4)
+     let! metaBuffer = asyncRead metaLength
+     let meta = deserialize<PacketMeta<'a>> metaBuffer
+     let! bodyLengthBuffer = asyncRead 4
      let bodyLength = BitConverter.ToInt32(bodyLengthBuffer)
-     let! body = stream.AsyncRead(bodyLength)
+     let! body = asyncRead bodyLength
      return (meta, body)
 }
 

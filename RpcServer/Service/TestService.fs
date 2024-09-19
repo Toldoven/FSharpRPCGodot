@@ -10,7 +10,7 @@ let pong (server: RpcServer) event = server.MakeServerEvent Route.pongEventRoute
 let register (router: Router) =
     
     router.AddRequestHandler Route.echoRequestRoute (fun _ echo -> async {
-        return echo  
+        return echo
     })
     
     router.AddClientEventHandler Route.pingEventRoute (fun server _ -> async {

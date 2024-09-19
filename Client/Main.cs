@@ -33,18 +33,23 @@ public partial class Main : Node
 		{
 			_testService.Ping();
 		};
+
+		var rpcClient = new RpcClient.RpcClient();
+
+		rpcClient.Connected += Utils.EventDeferred(() => {
+			_resultLabel.Text = "Connected!";
+		});
+
+		rpcClient.Disconnected += Utils.EventDeferred(() => {
+			_resultLabel.Text = "Disconnected!";
+		});
 		
+		await rpcClient.Connect("127.0.0.1", 8080);
 		
-		var tcpClient = new TcpClient();
-		await tcpClient.ConnectAsync("127.0.0.1", 8080);
-		GD.Print("Connected");
-		var rpcClient = new RpcClient.RpcClient(tcpClient);
 		_testService = new TestServiceClient(rpcClient);
+		
 		_testService.Pong += Utils.EventDeferred(() => {
 			_resultLabel.Text = "Pong!";
 		});
-		rpcClient.Start();
 	}
-
-
 }

@@ -22,7 +22,7 @@ let rec acceptClientLoop () = async {
     // Authorize
     // Load state
     // Create a handler after that    
-    let handler = RpcServer(client, router)
+    let handler = new RpcServer(client, router)
     handler.Start()
     return! acceptClientLoop()
 }

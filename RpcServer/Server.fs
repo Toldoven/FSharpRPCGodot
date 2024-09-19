@@ -3,7 +3,12 @@ module RpcServer.Server
 open System
 open System.Collections.Generic
 open System.Net.Sockets
+open System.Threading
 open RpcProtocol.Library
+
+
+exception UnknownRoute of route: string
+    with override this.Message = $"UnknownRoute: Can't find route with the specified name: {this.route}"
 
 
 type Router () =
@@ -12,11 +17,15 @@ type Router () =
     
     let eventRouteDictionary = Dictionary<String, RpcServer -> byte array -> Async<unit>>()
     
-    member this.GetRequestHandler (route: String) =
-        requestRouteDictionary[route]
+    member private this.getHandler (dictionary: Dictionary<String, 'V>) route =
+        if dictionary.ContainsKey route then
+            dictionary[route]
+        else
+            raise (UnknownRoute(route))
+    
+    member this.GetRequestHandler (route: String) = this.getHandler requestRouteDictionary route
         
-    member this.GetEventHandler (route: String) =
-        eventRouteDictionary[route]
+    member this.GetEventHandler (route: String) = this.getHandler eventRouteDictionary route 
      
     member this.AddRequestHandler (route: RequestRoute<'req, 'res>) (handler: RpcServer -> 'req -> Async<'res>) =
         let handler = fun (state: RpcServer) (body: byte array) -> async {
@@ -37,7 +46,7 @@ and RpcServer (tcpClient: TcpClient, router: Router) =
     
     let writerAgent = writerAgent tcpClient
     
-    // member private this.state = initState this
+    let cancellationToken = new CancellationTokenSource()
     
     member this.MakeServerEvent (route: ServerEventRoute<'e>) = fun (event: 'e) ->
         let packetMeta = {
@@ -49,30 +58,56 @@ and RpcServer (tcpClient: TcpClient, router: Router) =
         )
     
     member private this.handlePacket (meta: PacketMeta<ClientPacketType>, body: byte array) = async {
+        
         match meta.packetType with
         | ClientRequest requestId ->
-            let! response = router.GetRequestHandler meta.route this body
-            let packetMeta = {
-                packetType = ServerResponse requestId
-                route = meta.route
-            }
-            writerAgent.Post(
-                serializePacketRaw packetMeta response
-            )
+            try
+                let! response = router.GetRequestHandler meta.route this body
+                let packetMeta = {
+                    packetType = ServerResponse (requestId, true)
+                    route = meta.route
+                }
+                writerAgent.Post(
+                    serializePacketRaw packetMeta response
+                )
+            with
+            | e ->
+                printfn $"Error when processing request at `{meta.route}`: {e}"
+                let packetMeta = {
+                    packetType = ServerResponse (requestId, false)
+                    route = meta.route
+                }
+                writerAgent.Post(
+                    serializePacket packetMeta { message = e.ToString() }
+                )
+
         | ClientEvent ->
-            do! router.GetEventHandler meta.route this body
+            try
+                do! router.GetEventHandler meta.route this body
+            with
+            | e ->
+                printfn $"Error when processing event at `{meta.route}`: {e}"
     }
+    
+    interface IDisposable with
+        member this.Dispose() =
+            cancellationToken.Cancel()
+            cancellationToken.Dispose()
+            (writerAgent :> IDisposable).Dispose()
         
-    member this.Handle (stream: NetworkStream) = async {
+        
+    member private this.handle () = async {
         try
-            let! packet = readPacket<ClientPacketType>(stream)
-            this.handlePacket packet |> Async.Start
-            if tcpClient.Connected then return! this.Handle stream
+            use stream = tcpClient.GetStream()
+            let! packet = readPacket<ClientPacketType> stream cancellationToken.Token 
+            Async.Start(this.handlePacket packet, cancellationToken.Token)
+            return! this.handle ()
         with
-        | _ -> printfn "Client disconnected"
+        | _ ->
+            printfn "Client disconnected"
+            (this :> IDisposable).Dispose()     
     }
     
     member this.Start() =
-        let stream = tcpClient.GetStream()
         writerAgent.Start()
-        this.Handle(stream) |> Async.Start
+        this.handle () |> Async.Start
