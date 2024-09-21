@@ -7,3 +7,5 @@ riderModule.iml
 .DS_Store
 .env
 .envrc
+
+.fake

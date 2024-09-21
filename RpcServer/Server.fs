@@ -106,7 +106,8 @@ and RpcServer (tcpClient: TcpClient, router: Router) =
             Async.Start(this.handlePacket packet, cancellationToken.Token)
             return! this.handle ()
         with
-        | _ ->
+        | e ->
+            Log.Debug(e, $"Reason for client disconnect {clientAddress}")
             (this :> IDisposable).Dispose()     
     }
     

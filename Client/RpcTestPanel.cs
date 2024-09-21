@@ -1,18 +1,20 @@
 using Godot;
+using GodotUtilities;
 using RpcProtocol.Service.TestService;
 
 namespace Client;
 
+[Scene]
 public partial class RpcTestPanel : Control
 {
     [Export] private Rpc _rpc = null!;
     
-    private TextEdit _echoText = null!;
-    private Button _echoButton = null!;
-    private Button _pingButton = null!;
-    private Button _connectButton = null!;
-    private Button _disconnectButton = null!;
-    private Label _resultLabel = null!;
+    [Node] private TextEdit _echoText = null!;
+    [Node] private Button _echoButton = null!;
+    [Node] private Button _pingButton = null!;
+    [Node] private Button _connectButton = null!;
+    [Node] private Button _disconnectButton = null!;
+    [Node] private Label _resultLabel = null!;
 
     private void UpdateUi(Rpc.State state)
     {
@@ -30,12 +32,7 @@ public partial class RpcTestPanel : Control
     
     public override void _Ready()
     {
-        _echoText = GetNode<TextEdit>("%EchoText");
-        _echoButton = GetNode<Button>("%EchoButton");
-        _pingButton = GetNode<Button>("%PingButton");
-        _connectButton = GetNode<Button>("%ConnectButton");
-        _disconnectButton = GetNode<Button>("%DisconnectButton")!;
-        _resultLabel = GetNode<Label>("%ResultLabel");
+        WireNodes();
         
         UpdateUi(_rpc.CurrentState);
         

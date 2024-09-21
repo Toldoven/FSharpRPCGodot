@@ -19,7 +19,7 @@ Log.Logger <- LoggerConfiguration()
     
 let port = 8080
 
-let tcpListener = TcpListener(IPAddress.Any, port)
+let tcpListener = new TcpListener(IPAddress.Any, port)
 Log.Information $"Listener started on port {port}"
 tcpListener.Start()
 

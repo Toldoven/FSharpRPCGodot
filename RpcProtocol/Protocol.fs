@@ -92,7 +92,8 @@ let serializePacketRaw (packetMeta: PacketMeta<'a>) (bodyBytes: byte array) =
 let inline private asyncRead (stream: NetworkStream) (token: CancellationToken) (length: int) = async {
     let buffer = Array.zeroCreate length
     let! bytesRead = stream.ReadAsync(buffer, 0, length, token) |> Async.AwaitTask
-    assert (bytesRead = length)
+    if (bytesRead <> length) then
+        raise (InvalidOperationException($"Failed to read enough bytes from stream. Read: {bytesRead}. Expected: {length}"))
     return buffer
 }
 
