@@ -37,6 +37,7 @@ grow_vertical = 2
 
 [node name="RpcLabel" type="Label" parent="CanvasLayer/RpcTestPanel/HBoxContainer" node_paths=PackedStringArray("_rpc")]
 layout_mode = 2
+text = "State"
 script = ExtResource("3_r8j3w")
 _rpc = NodePath("../../../../Rpc")
 

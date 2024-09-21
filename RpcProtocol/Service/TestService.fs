@@ -1,6 +1,6 @@
 namespace RpcProtocol.Service.TestService
 
-open RpcProtocol.Library
+open RpcProtocol.Protocol
 open MessagePack
 
 [<MessagePackObject>]

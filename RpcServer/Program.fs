@@ -25,10 +25,6 @@ tcpListener.Start()
 
 let rec acceptClientLoop () = async {
     let! client = tcpListener.AcceptTcpClientAsync() |> Async.AwaitTask
-    // TODO:
-    // Authorize
-    // Load state
-    // Create a handler after that    
     let handler = new RpcServer(client, router)
     handler.Start()
     return! acceptClientLoop ()

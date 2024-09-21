@@ -1,4 +1,4 @@
-﻿module RpcProtocol.Library
+﻿module RpcProtocol.Protocol
 
 open System
 open System.Net.Sockets
@@ -21,7 +21,6 @@ let serialize<'a> (value: 'a) =
 
 let deserialize<'a> (value: byte array) =
     MessagePackSerializer.Deserialize<'a>(value, options)
-
     
 // A record that defines a request route. The generic parameters specify the request type and the response type
 type RequestRoute<'req, 'res> = { Path: String }
@@ -41,7 +40,6 @@ type ClientEventRoute<'e> = { Path: String }
 // A helper function to make a ClientEventRoute
 let clientEventRoute<'e> path : ClientEventRoute<'e> = { Path = path }
     
-    
 [<MessagePackObject>]
 // Client to Server
 type ClientPacketType =
@@ -60,7 +58,6 @@ type ResponseFailure = {
     [<Key(0)>]
     message: String
 }
-    
     
 [<MessagePackObject>]
 // Metadata attached to every packet
@@ -92,14 +89,12 @@ let serializePacketRaw (packetMeta: PacketMeta<'a>) (bodyBytes: byte array) =
     let bodyLength = getSerializedLength bodyBytes
     Array.concat [metaLength; metaBytes; bodyLength; bodyBytes]
 
-
-//
 let inline private asyncRead (stream: NetworkStream) (token: CancellationToken) (length: int) = async {
     let buffer = Array.zeroCreate length
-    do! stream.ReadAsync(buffer, 0, length, token) |> Async.AwaitTask |> Async.Ignore
+    let! bytesRead = stream.ReadAsync(buffer, 0, length, token) |> Async.AwaitTask
+    assert (bytesRead = length)
     return buffer
 }
-    
 
 // Read packet from stream
 let readPacket<'a> (stream: NetworkStream) (token: CancellationToken) = async {

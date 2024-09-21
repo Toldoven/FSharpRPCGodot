@@ -4,12 +4,12 @@ open System
 open System.Collections.Generic
 open System.Net.Sockets
 open System.Threading
-open RpcProtocol.Library
+open RpcProtocol.Protocol
 open Serilog
 
 
 exception UnknownRoute of route: string
-    with override this.Message = $"UnknownRoute: Can't find route with the specified name: {this.route}"
+    with override this.Message = $"Unknown route. Can't find route with the specified name: {this.route}"
 
 
 type Router () =
@@ -24,9 +24,9 @@ type Router () =
         else
             raise (UnknownRoute(route))
     
-    member this.GetRequestHandler (route: String) = this.getHandler requestRouteDictionary route
+    member this.GetRequestHandler route = this.getHandler requestRouteDictionary route
         
-    member this.GetEventHandler (route: String) = this.getHandler eventRouteDictionary route 
+    member this.GetEventHandler route = this.getHandler eventRouteDictionary route 
      
     member this.AddRequestHandler (route: RequestRoute<'req, 'res>) (handler: RpcServer -> 'req -> Async<'res>) =
         let handler = fun (state: RpcServer) (body: byte array) -> async {
@@ -63,6 +63,7 @@ and RpcServer (tcpClient: TcpClient, router: Router) =
         match meta.packetType with
         | ClientRequest requestId ->
             try
+                Log.Debug $"Handling response {meta.route} from {clientAddress}"
                 let! response = router.GetRequestHandler meta.route this body
                 let packetMeta = {
                     packetType = ServerResponse (requestId, true)
@@ -84,6 +85,7 @@ and RpcServer (tcpClient: TcpClient, router: Router) =
 
         | ClientEvent ->
             try
+                Log.Debug $"Handling event {meta.route} from {clientAddress}"
                 do! router.GetEventHandler meta.route this body
             with
             | e ->
@@ -92,10 +94,10 @@ and RpcServer (tcpClient: TcpClient, router: Router) =
     
     interface IDisposable with
         member this.Dispose() =
+            Log.Information $"Client disconnected {clientAddress}"
             cancellationToken.Cancel()
             cancellationToken.Dispose()
             (writerAgent :> IDisposable).Dispose()
-        
         
     member private this.handle () = async {
         try
@@ -105,7 +107,6 @@ and RpcServer (tcpClient: TcpClient, router: Router) =
             return! this.handle ()
         with
         | _ ->
-            Log.Information $"Client disconnected {clientAddress}"
             (this :> IDisposable).Dispose()     
     }
     

@@ -14,7 +14,7 @@ public partial class Rpc : Node
     
     public enum State
     {
-        Open,
+        Connected,
         Connecting,
         Closed,
     }
@@ -25,26 +25,33 @@ public partial class Rpc : Node
     {
         CurrentState = state;
         EmitSignal(SignalName.StateChanged, (int)CurrentState);
+        if (CurrentState == State.Connected)
+        {
+            EmitSignal(SignalName.Connected);
+        }
     }
     
     [Signal]
     public delegate void StateChangedEventHandler(State state);
     
-    public RpcClient.RpcClient? Client;
+    [Signal]
+    public delegate void ConnectedEventHandler();
     
-    public TestServiceClient Test = null!;
+    private RpcClient.RpcClient? _client;
+    
+    public TestServiceClient? Test;
 
     public async void Connect()
     {
         if (CurrentState != State.Closed) throw new InvalidOperationException("Can't open RPC that is not closed");
         
-        Client = new RpcClient.RpcClient();
+        _client = new RpcClient.RpcClient();
         
-        Client.Connected += Utils.EventDeferred(() => {
-            SetState(State.Open);
+        _client.Connected += Utils.EventDeferred(() => {
+            SetState(State.Connected);
         });
 
-        Client.Disconnected += Utils.EventDeferred(() => {
+        _client.Disconnected += Utils.EventDeferred(() => {
             SetState(State.Closed);
         });
         
@@ -52,8 +59,8 @@ public partial class Rpc : Node
 
         try
         {
-            await Client.Connect(_address, _port);
-            Test = new TestServiceClient(Client);
+            await _client.Connect(_address, _port);
+            Test = new TestServiceClient(_client);
         }
         catch (Exception e)
         {
@@ -64,11 +71,11 @@ public partial class Rpc : Node
 
     public void Disconnect()
     {
-        if (CurrentState != State.Open) throw new InvalidOperationException("Can't close RPC that is not open");
+        if (CurrentState != State.Connected) throw new InvalidOperationException("Can't close RPC that is not open");
         
-        if (Client == null) throw new InvalidOperationException("Client should not be null when it's open");
+        if (_client == null) throw new InvalidOperationException("Client should not be null when it's open");
         
-        Client.Close();
+        _client.Close();
     }
     
     public override void _Ready()

@@ -4,7 +4,7 @@ open RpcProtocol.Service.TestService
 open RpcServer.Server
 
 
-let pong (server: RpcServer) event = server.MakeServerEvent Route.pongEventRoute event
+let pong (server: RpcServer) = server.MakeServerEvent Route.pongEventRoute ()
 
 
 let register (router: Router) =
@@ -14,5 +14,5 @@ let register (router: Router) =
     })
     
     router.AddClientEventHandler Route.pingEventRoute (fun server _ -> async {
-        pong server ()
+        server |> pong
     })

@@ -6,7 +6,7 @@ open System.Net.Sockets
 open System.Threading
 open System.Threading.Tasks
 open Microsoft.FSharp.Core
-open RpcProtocol.Library
+open RpcProtocol.Protocol
 
 type private RequestAgentMessage =
     | Register of replyChannel: AsyncReplyChannel<int * TaskCompletionSource<byte array>>
@@ -25,7 +25,7 @@ type RpcClient() =
     
     let disconnectedEvent = Event<EventHandler<unit>, unit>()
     
-    // TODO: Replace with SlotMap
+    // TODO: Can be replaced with a SlotMap
     let requestDictionary = Dictionary<int, TaskCompletionSource<byte array>>()
     
     // String is a route path. Value is a handler for the event at the given route
@@ -74,7 +74,7 @@ type RpcClient() =
             Failure (requestId, deserialize body) |> requestAgent.Post
         | ServerEvent ->
             // Get a handler for a route and pass a body into it. This will trigger the event
-            body |> eventHandlerDictionary[meta.route]
+            eventHandlerDictionary[meta.route] body
             
     interface IDisposable with
         member this.Dispose() =
@@ -94,7 +94,7 @@ type RpcClient() =
         let packetMeta = {
             // We pass the unique requestId in the request
             // When the server processes the request - it will return a response with the same id
-            // That's how we know what
+            // That's how we'll know that the response is for this request
             packetType = ClientRequest requestId
             route = route.Path
         }

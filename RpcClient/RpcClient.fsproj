@@ -8,7 +8,6 @@
     <ItemGroup>
         <Compile Include="RpcClient.fs" />
         <Compile Include="Service\TestService.fs" />
-        <Compile Include="Test.fs" />
     </ItemGroup>
 
     <ItemGroup>

@@ -1,5 +1,4 @@
 using Godot;
-using GodotUtilities;
 using RpcProtocol.Service.TestService;
 
 namespace Client;
@@ -15,27 +14,13 @@ public partial class RpcTestPanel : Control
     private Button _disconnectButton = null!;
     private Label _resultLabel = null!;
 
-    private void UpdateUi(bool enable)
-    {
-        _echoButton.Disabled = !enable;
-        _pingButton.Disabled = !enable;
-        _connectButton.Disabled = enable;
-        _disconnectButton.Disabled = !enable;
-    }
-
     private void UpdateUi(Rpc.State state)
     {
-        switch (state)
-        {
-            case Client.Rpc.State.Open:
-                UpdateUi(true);
-                break;
-            case Client.Rpc.State.Connecting:
-            case Client.Rpc.State.Closed:
-            default:
-                UpdateUi(false);
-                break;
-        }
+        var connected = state == Client.Rpc.State.Connected;
+        _echoButton.Disabled = !connected;
+        _pingButton.Disabled = !connected;
+        _connectButton.Disabled = connected;
+        _disconnectButton.Disabled = !connected;
     }
 
     private void SetResult(string result)
@@ -60,21 +45,19 @@ public partial class RpcTestPanel : Control
         {
             var message = new Echo(_echoText.Text);
             SetResult("Loading...");
-            var result = await _rpc.Test.Echo(message);
+            // Safe to call because the button is disabled when the client is not connected
+            var result = await _rpc.Test!.Echo(message);
             SetResult(result.message);
         };
         
         _pingButton.Pressed += () =>
         {
-            _rpc.Test.Ping();
+            _rpc.Test!.Ping();
         };
 
-        // TODO: Improve API so you don't have to do it like this
-        _rpc.StateChanged += state =>
+        _rpc.Connected += () =>
         {
-            if (state != Client.Rpc.State.Open) return;
-
-            _rpc.Test.Pong += Utils.EventDeferred(() =>
+            _rpc.Test!.Pong += Utils.EventDeferred(() =>
             {
                 SetResult("Pong!");
             });

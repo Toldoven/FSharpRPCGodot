@@ -6,16 +6,13 @@ public partial class RpcLabel : Label
 {
     [Export] private Rpc _rpc = null!;
 
-    private static string StateString(Rpc.State state)
+    private static string StateString(Rpc.State state) => state switch
     {
-        return state switch
-        {
-            Client.Rpc.State.Open => "Open",
-            Client.Rpc.State.Connecting => "Connecting",
-            Client.Rpc.State.Closed => "Closed",
-            _ => "Unknown"
-        };
-    }
+        Client.Rpc.State.Connected => "Open",
+        Client.Rpc.State.Connecting => "Connecting",
+        Client.Rpc.State.Closed => "Closed",
+        _ => "Unknown"
+    };
 
     public override void _Ready()
     {
