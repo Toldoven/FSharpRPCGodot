@@ -25,9 +25,6 @@ type RpcClient() =
     
     let disconnectedEvent = Event<EventHandler<unit>, unit>()
     
-    // TODO: Can be replaced with a SlotMap
-    let requestDictionary = Dictionary<int, TaskCompletionSource<byte array>>()
-    
     // String is a route path. Value is a handler for the event at the given route
     let eventHandlerDictionary = Dictionary<String, byte array -> unit>()
     
@@ -36,9 +33,8 @@ type RpcClient() =
     // You should not write to stream directly, only through this agent
     let writerAgent = writerAgent tcpClient
     
-    // This agent is used so that you can only access `requestDictionary` once at the same time
-    // Don't access `requestDictionary` directly
     let requestAgent = new MailboxProcessor<RequestAgentMessage>(fun inbox ->
+        let requestDictionary = Dictionary<int, TaskCompletionSource<byte array>>()
         let rec loop currentRequestId = async {
             let! message = inbox.Receive()
             match message with
