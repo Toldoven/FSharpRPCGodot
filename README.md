@@ -54,13 +54,13 @@ The packet types are defined separately for the server and for the client.
 ```fsharp
 // Client to Server
 type ClientPacketType =
-| ClientRequest of requestId: int
-| ClientEvent
+    | ClientRequest of requestId: int
+    | ClientEvent
 
 // Server to Client
 type ServerPacketType =
-| ServerResponse of requestId: int * success: Boolean
-| ServerEvent
+    | ServerResponse of requestId: int * success: Boolean
+    | ServerEvent
 ```
 
 Since packet type is a [discriminated union](https://learn.microsoft.com/en-us/dotnet/fsharp/language-reference/discriminated-unions) — each packet type can hold unique associated data. 
