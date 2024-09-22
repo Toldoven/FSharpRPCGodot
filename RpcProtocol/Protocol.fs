@@ -69,6 +69,9 @@ type PacketMeta<'T> = {
     route: String
 }
 
+// Each packet is structured like this:
+// Meta Length (4 Bytes) | Meta (N Bytes) | Body Length (4 Bytes) | Body (M Bytes)
+
 // Get the length of a message and serialize it as raw bytes
 let inline private getSerializedLength (data: byte array) = BitConverter.GetBytes(data.Length)
 
