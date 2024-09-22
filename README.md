@@ -1,10 +1,11 @@
-# F# RCP Protocol + C# Godot Client
+# F# RPC Protocol + C# Godot Client
 
 Example of F# TCP-based RPC server and protocol integrated with C# Godot Client.
 
 Note that the protocol is not a good universal solution. It is a solution for a [specific game](https://penpalsdelight.com/) we are making.
 
-![demo.mp4](demo.mp4)
+
+https://github.com/user-attachments/assets/7e394c8a-5073-4784-9d45-c372f32acdce
 
 ## Running the example
 
@@ -22,7 +23,7 @@ Requires [Net 8.0 SDK](https://dotnet.microsoft.com/en-us/download/dotnet/8.0) a
 - Persistent connection.
     - The server needs to be stateful. Each client has its own state. We want to load it when the player connects and save it when the player disconnects.
 - Not for real-time games.
-    - The game we are building features asynchronous multiplayer, so TCP is well-suited for it.
+    - The [game we are building](https://penpalsdelight.com/) features asynchronous multiplayer, so TCP is well-suited for it.
 - Dead simple and easily modifiable.
     - The protocol, server, and client combined are 308 lines of code. (comments and blanks not counted)
     - The protocol is not a good universal solution for any game. But because it's so simple — it's easy to modify it as the requirements for the project evolve.
