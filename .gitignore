@@ -9,3 +9,4 @@ riderModule.iml
 .envrc
 .idea/
 .fake
+*.DotSettings.user
